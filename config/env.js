@@ -50,8 +50,14 @@ function loadEnvConfig() {
     ACCESSCODEDEV: process.env.ACCESSCODEDEV || 'devcode123',
 
     // Rate Limiting
-    RATE_LIMIT_WINDOW: parseInt(process.env.RATE_LIMIT_WINDOW) || 60000,
+    RATE_LIMIT_WINDOW: parseInt(process.env.RATE_LIMIT_WINDOW || process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX) || 500,
+    PUBLIC_RATE_LIMIT_WINDOW: parseInt(process.env.PUBLIC_RATE_LIMIT_WINDOW || process.env.PUBLIC_RATE_LIMIT_WINDOW_MS) || 60000,
+    PUBLIC_RATE_LIMIT_MAX: parseInt(process.env.PUBLIC_RATE_LIMIT_MAX) || 120,
+
+    // In-memory response cache for public GET endpoints
+    PUBLIC_CACHE_TTL: parseInt(process.env.PUBLIC_CACHE_TTL || process.env.PUBLIC_CACHE_TTL_MS) || 30000,
+    PUBLIC_CACHE_MAX_ITEMS: parseInt(process.env.PUBLIC_CACHE_MAX_ITEMS) || 1000,
 
     // CORS
     CORS_ORIGINS: process.env.CORS_ORIGINS || '*',

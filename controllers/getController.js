@@ -12,6 +12,12 @@ let teamsCache = null;
 let teamsCacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Cache for games (live data - refreshed every 30s)
+const GAME_CACHE_TTL = 30 * 1000; // 30 seconds
+const gameCache = new Map(); // key: gameId → { data, time }
+let allGamesCache = null;
+let allGamesCacheTime = 0;
+
 async function getTeamsMap() {
     const now = Date.now();
     if (teamsCache && (now - teamsCacheTime) < CACHE_TTL) {
@@ -340,6 +346,11 @@ router.get('/teams', async(req,res) => {
  */
 router.get('/games', async(req,res) => {
     try{
+        const now = Date.now();
+        if (allGamesCache && (now - allGamesCacheTime) < GAME_CACHE_TTL) {
+            return res.send({ games: allGamesCache });
+        }
+
         // Use lean() for faster queries
         const games = await Game.find({}).lean();
 
@@ -360,6 +371,9 @@ router.get('/games', async(req,res) => {
             
             return game;
         });
+
+        allGamesCache = gamesWithNames;
+        allGamesCacheTime = now;
 
         return res.send({games: gamesWithNames});
     }catch(err){
@@ -402,7 +416,17 @@ router.get('/games', async(req,res) => {
  */
 router.get('/game/:idGame', async(req,res) => {
     try{
-        const game = await Game.findById(req.params.idGame).lean();
+        const id = req.params.idGame;
+        const now = Date.now();
+        const cached = gameCache.get(id);
+        if (cached && (now - cached.time) < GAME_CACHE_TTL) {
+            return res.send({ game: cached.data });
+        }
+
+        const game = await Game.findById(id).lean();
+        if (game) {
+            gameCache.set(id, { data: game, time: now });
+        }
 
         return res.send({game});
     }catch(err){

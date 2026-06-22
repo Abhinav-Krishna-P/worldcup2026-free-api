@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const helmet = require('helmet');
 const cors = require('cors');
+const createResponseCache = require('./middleware/responseCache');
 
 // Catch unhandled errors
 process.on('uncaughtException', (err) => {
@@ -80,44 +81,73 @@ app.use(helmet({
 app.use(compression());
 
 // Rate limiting - configurable per environment
-const limiter = rateLimit({
+const baseLimiter = rateLimit({
     windowMs: config.RATE_LIMIT_WINDOW,
     max: config.RATE_LIMIT_MAX,
     message: {
         error: 'Too many requests, please try again later.',
-        retryAfter: '1 second'
+        retryAfter: `${Math.ceil(config.RATE_LIMIT_WINDOW / 1000)} seconds`
     },
     standardHeaders: true,
     legacyHeaders: false,
     validate: { xForwardedForHeader: false },
 });
-app.use(limiter);
-
-// Logging - always enabled
-app.use(morgan(':date[iso] :method :url :status :res[content-length] - :response-time ms'));
-
-// Request logger - log every request with details
-app.use((req, res, next) => {
-    const start = Date.now();
-    console.log(`📥 ${req.method} ${req.url} from ${req.ip}`);
-    
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        const statusIcon = res.statusCode >= 400 ? '❌' : '✅';
-        console.log(`${statusIcon} ${req.method} ${req.url} → ${res.statusCode} (${duration}ms)`);
-    });
-    
-    next();
+const publicGetLimiter = rateLimit({
+    windowMs: config.PUBLIC_RATE_LIMIT_WINDOW,
+    max: config.PUBLIC_RATE_LIMIT_MAX,
+    message: {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: `${Math.ceil(config.PUBLIC_RATE_LIMIT_WINDOW / 1000)} seconds`
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
+app.use((req, res, next) => {
+    if (req.path.startsWith('/get')) {
+        return publicGetLimiter(req, res, next);
+    }
+
+    return baseLimiter(req, res, next);
+});
+
+// Logging
+app.use(morgan(':date[iso] :method :url :status :res[content-length] - :response-time ms', {
+    skip: (req, res) => config.isProd && res.statusCode < 400
+}));
+
+if (config.LOG_LEVEL === 'debug') {
+    // Request logger - useful locally, too noisy under production traffic
+    app.use((req, res, next) => {
+        const start = Date.now();
+        console.log(`📥 ${req.method} ${req.url} from ${req.ip}`);
+        
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            const statusIcon = res.statusCode >= 400 ? '❌' : '✅';
+            console.log(`${statusIcon} ${req.method} ${req.url} → ${res.statusCode} (${duration}ms)`);
+        });
+        
+        next();
+    });
+}
 
 console.log(`🌍 Environment: ${config.NODE_ENV}`);
 console.log(`📊 Rate Limit: ${config.RATE_LIMIT_MAX} req/${config.RATE_LIMIT_WINDOW}ms`);
+console.log(`📊 Public /get Rate Limit: ${config.PUBLIC_RATE_LIMIT_MAX} req/${config.PUBLIC_RATE_LIMIT_WINDOW}ms`);
+console.log(`🧠 Public /get Cache: ${config.PUBLIC_CACHE_TTL}ms, max ${config.PUBLIC_CACHE_MAX_ITEMS} items`);
 console.log(`🔗 CORS Origin: ${typeof corsOrigins === 'string' ? corsOrigins : corsOrigins.join(', ')}`);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 const path = require('path');
 
 app.use(bodyParser.json({ limit: '10kb' })); // Limit body size
+
+app.use('/get', createResponseCache({
+    ttlMs: config.PUBLIC_CACHE_TTL,
+    maxItems: config.PUBLIC_CACHE_MAX_ITEMS,
+    shouldCache: (req) => req.method === 'GET'
+}));
 
 // Dynamic sitemap - must be before static files middleware
 require('./controllers/seoController')(app);

@@ -791,6 +791,8 @@ Built something with this API? Open a PR to add it here!
 
 **Built with this API:**
 
+- 🤖 **[BigFish — Predictive Betting AI](https://jesunahmadushno.github.io/BigFish/)** — Predictive betting dashboard that uses this API’s live match data with a Dixon–Coles model to estimate expected goals (xG) and derive betting odds.
+
 - 📱 **[MUNDIAL '26](https://github.com/andamagodwin/worldcup26)** — Open-source FIFA World Cup 2026 companion app (Expo / React Native): live scores, group standings, knockout bracket, all 48 teams & 16 stadiums, with an English / Farsi toggle.
 
   <a href="https://github.com/andamagodwin/worldcup26"><img src="https://raw.githubusercontent.com/andamagodwin/worldcup26/main/assets/screenshots/matches-screen.png" alt="MUNDIAL '26 — matches screen" width="240" /></a>
